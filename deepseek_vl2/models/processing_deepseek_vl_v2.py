@@ -29,6 +29,7 @@ from transformers.processing_utils import ProcessorMixin
 from PIL import Image, ImageOps
 
 from .conversation import get_conv_template
+from collections import Counter
 
 
 def select_best_resolution(image_size, candidate_resolutions):
@@ -318,7 +319,6 @@ class DeepseekVLV2Processor(ProcessorMixin):
         assert len(tokenized_data) == len(
             images_seq_mask), f"format_messages_v2: tokenized_str's length {len(tokenized_str)} is not equal to imags_seq_mask's length {len(images_seq_mask)}"
         assert len(images_spatial_crop) == len(num_image_tokens), f"image number should be compatible"
-
         return tokenized_data, masked_tokenized_data, images_list, images_seq_mask, images_spatial_crop, num_image_tokens
 
     def format_prompts(
@@ -402,8 +402,7 @@ class DeepseekVLV2Processor(ProcessorMixin):
                 - images (torch.FloatTensor): [n_images, 3, H, W]
                 - image_id (int): the id of the image token
                 - num_image_tokens (List[int]): the number of image tokens
-        """
-
+        """             
         assert (
                 prompt is None or conversations is None
         ), "prompt and conversations cannot be used at the same time."
@@ -438,10 +437,12 @@ class DeepseekVLV2Processor(ProcessorMixin):
         assert len(tokenized_str) == len(images_seq_mask) == len(masked_tokenized_str), \
             (f"tokenized_str's length {len(tokenized_str)}, input_ids' length {len(masked_tokenized_str)}, "
              f"imags_seq_mask's length {len(images_seq_mask)}, are not equal")
-
+        
+        
         input_ids = torch.LongTensor(tokenized_str)
         target_ids = torch.LongTensor(masked_tokenized_str)
         images_seq_mask = torch.tensor(images_seq_mask, dtype=torch.bool)
+        
 
         # set input_ids < 0 | input_ids == self.image_token_id as ignore_id
         target_ids[(input_ids < 0) | (input_ids == self.image_token_id)] = self.ignore_id
@@ -460,6 +461,7 @@ class DeepseekVLV2Processor(ProcessorMixin):
         else:
             images = torch.stack(images_list, dim=0)
             images_spatial_crop = torch.tensor(images_spatial_crop, dtype=torch.long)
+        
 
         prepare = VLChatProcessorOutput(
             sft_format=sft_format,
@@ -626,11 +628,21 @@ class DeepseekVLV2Processor(ProcessorMixin):
             #   using a method to encode the text followed by a call to the `pad` method to get a padded encoding.
             padded_input_ids = self.tokenizer.pad({"input_ids": batched_input_ids})
             batched_input_ids, batched_attention_mask = padded_input_ids["input_ids"], padded_input_ids[
-                "attention_mask"].bool()
+            "attention_mask"].bool()
             batched_labels = self.tokenizer.pad({"input_ids": batched_labels})["input_ids"]
             batched_labels[batched_labels == self.pad_id] = self.ignore_id  # labels正常不会出现pad_id，无需额外保护
-            batched_images_seq_mask = self.tokenizer.pad({"input_ids": batched_images_seq_mask})["input_ids"]
-            batched_images_seq_mask[batched_images_seq_mask == self.pad_id] = False
+            # Convert each mask to a Boolean tensor
+            batched_images_seq_mask = [torch.tensor(mask, dtype=torch.bool) for mask in batched_images_seq_mask]
+            # Manually pad to max sequence length with `False`
+            batched_images_seq_mask = pad_sequence(
+                batched_images_seq_mask, batch_first=True, padding_value=False
+            )
+            # Check if pad_id actually exists in the mask
+            pad_id_exists = (batched_images_seq_mask == self.pad_id).any().item()
+
+            if pad_id_exists:
+                batched_images_seq_mask[batched_images_seq_mask == self.pad_id] = False
+            
         else:
             batched_input_ids = pad_sequence(batched_input_ids, batch_first=True, padding_value=self.pad_id)
             batched_labels = pad_sequence(batched_labels, batch_first=True, padding_value=self.ignore_id)

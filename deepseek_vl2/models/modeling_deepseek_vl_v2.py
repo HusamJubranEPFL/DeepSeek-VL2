@@ -365,7 +365,8 @@ class DeepseekVLV2ForCausalLM(DeepseekVLV2PreTrainedModel):
                 if num_width_tiles == 0 or num_height_tiles == 0:
                     break
                 batch_num_tiles[idx] += (1 + num_width_tiles * num_height_tiles)
-
+            # Convert batch_num_tiles[idx] to an integer before using it as an index
+            batch_num_tiles[idx] = int(batch_num_tiles[idx].item()) if isinstance(batch_num_tiles[idx], torch.Tensor) else batch_num_tiles[idx]
             total_tiles.append(images[idx, :batch_num_tiles[idx]])
 
         # [batch_all_tiles, 3, height, width]
@@ -384,7 +385,7 @@ class DeepseekVLV2ForCausalLM(DeepseekVLV2PreTrainedModel):
 
         # put image tokens into the input_embeds, [b, T, D]
         input_embeds = self.language.get_input_embeddings()(input_ids)
-
+        
         # 根据self.tile_tag & self.global_view_pos填充image token sequence
         tile_index = 0
         for idx in range(images_spatial_crop.shape[0]):
@@ -570,7 +571,7 @@ class DeepseekVLV2ForCausalLM(DeepseekVLV2PreTrainedModel):
             images_spatial_crop: Optional[torch.LongTensor] = None,
 
             labels: Optional[torch.LongTensor] = None,
-            use_cache: Optional[bool] = None,
+            use_cache: Optional[bool] = True,
             output_attentions: Optional[bool] = None,
             output_hidden_states: Optional[bool] = None,
             return_dict: Optional[bool] = None,
