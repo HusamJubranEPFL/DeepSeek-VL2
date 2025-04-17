@@ -577,7 +577,6 @@ class DeepseekVLV2ForCausalLM(DeepseekVLV2PreTrainedModel):
             return_dict: Optional[bool] = None,
             cache_position: Optional[torch.LongTensor] = None,
     ):
-
         output_attentions = (
             output_attentions
             if output_attentions is not None
@@ -589,7 +588,6 @@ class DeepseekVLV2ForCausalLM(DeepseekVLV2PreTrainedModel):
             else self.config.output_hidden_states
         )
         use_cache = use_cache if use_cache is not None else self.config.use_cache
-
         return_dict = (
             return_dict if return_dict is not None else self.config.use_return_dict
         )
@@ -603,7 +601,6 @@ class DeepseekVLV2ForCausalLM(DeepseekVLV2PreTrainedModel):
 
             if attention_mask is not None:
                 attention_mask = attention_mask.to(inputs_embeds.device)
-
         # print(inputs_embeds.shape)
         outputs = self.language.forward(
             input_ids=None,

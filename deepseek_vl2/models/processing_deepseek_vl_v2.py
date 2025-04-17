@@ -672,7 +672,6 @@ class DeepseekVLV2Processor(ProcessorMixin):
                 images_spatial_crop = torch.cat([images_spatial_crop, pad_images_spatial_crop], dim=0)
             batched_images_spatial_crop.append(images_spatial_crop)
         batched_images_spatial_crop = torch.stack(batched_images_spatial_crop, dim=0)
-
         batched_samples = BatchCollateOutput(
             input_ids=batched_input_ids,
             attention_mask=batched_attention_mask,

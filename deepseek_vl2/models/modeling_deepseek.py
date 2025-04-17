@@ -1720,11 +1720,9 @@ class DeepseekV2ForCausalLM(DeepseekV2PreTrainedModel):
             return_dict=return_dict,
             cache_position=cache_position
         )
-
         hidden_states = outputs[0]
         logits = self.lm_head(hidden_states)
         logits = logits.float()
-
         loss = None
         if labels is not None:
             # Shift so that tokens < n predict n
@@ -1737,11 +1735,9 @@ class DeepseekV2ForCausalLM(DeepseekV2PreTrainedModel):
             # Enable model parallelism
             shift_labels = shift_labels.to(shift_logits.device)
             loss = loss_fct(shift_logits, shift_labels)
-
         if not return_dict:
             output = (logits,) + outputs[1:]
             return (loss,) + output if loss is not None else output
-
         return CausalLMOutputWithPast(
             loss=loss,
             logits=logits,
