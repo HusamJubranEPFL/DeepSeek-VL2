@@ -473,7 +473,16 @@ class DeepseekVLV2ForCausalLM(DeepseekVLV2PreTrainedModel):
 
             if len(images_in_this_batch) > 0:
                 images_in_this_batch = torch.cat(images_in_this_batch, dim=0)
-                input_embeds[idx].masked_scatter_(images_seq_mask[idx].unsqueeze(-1), images_in_this_batch)
+
+                # Align dtype (bf16)
+                images_in_this_batch = images_in_this_batch.to(input_embeds.dtype)
+
+                # Fix mask dtype
+                mask = images_seq_mask[idx].to(torch.bool).unsqueeze(-1)
+
+                input_embeds[idx].masked_scatter_(mask, images_in_this_batch)
+
+
 
         return input_embeds
 
@@ -605,19 +614,21 @@ class DeepseekVLV2ForCausalLM(DeepseekVLV2PreTrainedModel):
                 attention_mask = attention_mask.to(inputs_embeds.device)
 
         # print(inputs_embeds.shape)
-        outputs = self.language.forward(
-            input_ids=None,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            past_key_values=past_key_values,
-            inputs_embeds=inputs_embeds,
-            labels=labels,
-            use_cache=use_cache,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-            cache_position=cache_position
-        )
+        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+            outputs = self.language.forward(
+                input_ids=None,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_values=past_key_values,
+                inputs_embeds=inputs_embeds,
+                labels=labels,
+                use_cache=use_cache,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+                cache_position=cache_position
+            )
+
 
         return outputs
 
