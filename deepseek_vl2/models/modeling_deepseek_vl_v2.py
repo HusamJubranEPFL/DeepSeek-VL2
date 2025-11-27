@@ -247,10 +247,11 @@ class DeepseekVLV2Config(PretrainedConfig):
             tile_tag: str = "tile_tag",
             global_view_pos: str = "head",
             candidate_resolutions: Tuple[Tuple[int, int]] = ((384, 384),),
+            use_cache: bool = True,
             **kwargs
     ):
         super().__init__(**kwargs)
-
+        self.use_cache = use_cache
         vision_config = kwargs.get("vision_config", {})
         self.vision_config = VisionEncoderConfig(**vision_config)
 

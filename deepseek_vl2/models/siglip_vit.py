@@ -133,7 +133,13 @@ class Attention(nn.Module):
         self.proj_drop = nn.Dropout(proj_drop) if proj_drop > 0. else nn.Identity()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        from xformers.ops import memory_efficient_attention
+        try:
+            from xformers.ops import memory_efficient_attention
+            HAS_XFORMERS = True
+        except Exception:
+            HAS_XFORMERS = False
+            memory_efficient_attention = None
+
 
         B, N, C = x.shape
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim)
@@ -145,7 +151,19 @@ class Attention(nn.Module):
                                               deterministic=self.deterministic)
             else:
                 q, k, v = qkv.unbind(2)
-                x = memory_efficient_attention(q, k, v, p=self.attn_drop.p if self.training else 0.)
+                if HAS_XFORMERS:
+                    # original DeepSeek line
+                    x = memory_efficient_attention(
+                        q, k, v,
+                        p = self.attn_drop.p if self.training else 0.
+                    )
+                else:
+                    # FALLBACK: PyTorch 2.x SDPA (works on GH200)
+                    x = torch.nn.functional.scaled_dot_product_attention(
+                        q, k, v,
+                        dropout_p = self.attn_drop.p if self.training else 0.,
+                        is_causal = False
+                    )
             x = x.reshape(B, N, C)
             x = self.proj(x)
             x = self.proj_drop(x)
